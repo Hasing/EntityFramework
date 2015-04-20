@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
@@ -44,6 +43,7 @@ namespace Microsoft.Data.Entity.Relational.Query
 
         public virtual bool RequiresClientFilter => _requiresClientFilter;
         public virtual bool RequiresClientProjection => _projectionTreeVisitor.RequiresClientEval;
+        public virtual bool RequiresClientResultOperator { get; set; }
 
         public new virtual RelationalQueryCompilationContext QueryCompilationContext
             => (RelationalQueryCompilationContext)base.QueryCompilationContext;
@@ -77,7 +77,7 @@ namespace Microsoft.Data.Entity.Relational.Query
         {
             Check.NotNull(querySource, nameof(querySource));
 
-            return _projectionTreeVisitor 
+            return _projectionTreeVisitor
                 = new RelationalProjectionExpressionTreeVisitor(this, querySource);
         }
 
@@ -408,21 +408,24 @@ namespace Microsoft.Data.Entity.Relational.Query
             IQuerySource querySource,
             IProperty property)
         {
-            var selectExpression = TryGetQuery(querySource);
-
-            if (selectExpression != null)
+            if (querySource != null)
             {
-                return memberBinder(property, querySource, selectExpression);
+                var selectExpression = TryGetQuery(querySource);
+
+                if (selectExpression != null)
+                {
+                    return memberBinder(property, querySource, selectExpression);
+                }
+
+                selectExpression
+                    = _parentQueryModelVisitor?.TryGetQuery(querySource);
+
+                selectExpression?
+                    .AddToProjection(
+                        QueryCompilationContext.GetColumnName(property),
+                        property,
+                        querySource);
             }
-
-            selectExpression
-                = _parentQueryModelVisitor?.TryGetQuery(querySource);
-
-            selectExpression?
-                .AddToProjection(
-                    QueryCompilationContext.GetColumnName(property),
-                    property,
-                    querySource);
 
             return default(TResult);
         }
@@ -441,7 +444,8 @@ namespace Microsoft.Data.Entity.Relational.Query
             return new QuerySourceScope<IValueReader>(
                 querySource,
                 ((RelationalQueryContext)queryContext).ValueReaderFactory.CreateValueReader(dataReader),
-                parentQuerySourceScope);
+                parentQuerySourceScope,
+                null);
         }
 
         public static readonly MethodInfo CreateEntityMethodInfo
@@ -484,7 +488,8 @@ namespace Microsoft.Data.Entity.Relational.Query
                             valueReader,
                             materializer),
                         queryStateManager),
-                parentQuerySourceScope);
+                parentQuerySourceScope,
+                valueReader);
         }
     }
 }
