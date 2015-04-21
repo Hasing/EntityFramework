@@ -88,8 +88,7 @@ namespace Microsoft.Data.Entity.Relational.Query.ExpressionTreeVisitors
 
             var fromSqlAnnotation = QueryModelVisitor.QueryCompilationContext.QueryAnnotations
                 .OfType<FromSqlQueryAnnotation>()
-                .Where(a => a.QuerySource == _querySource)
-                .SingleOrDefault();
+                .SingleOrDefault(a => a.QuerySource == _querySource);
 
             selectExpression.AddTable(
                 (fromSqlAnnotation != null)
@@ -112,6 +111,7 @@ namespace Microsoft.Data.Entity.Relational.Query.ExpressionTreeVisitors
                         Expression.Constant(_querySource),
                         EntityQueryModelVisitor.QueryContextParameter,
                         EntityQueryModelVisitor.QuerySourceScopeParameter,
+                        Expression.Constant(QueryModelVisitor.QueryCompilationContext.ValueReaderFactory),
                         _readerParameter
                     };
 
